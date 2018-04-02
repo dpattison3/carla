@@ -15,24 +15,29 @@ import logging
 import random
 import time
 
+from carla import image_converter
 from carla.client import make_carla_client
 from carla.sensor import Camera, Lidar
 from carla.settings import CarlaSettings
 from carla.tcp import TCPConnectionError
 from carla.util import print_over_same_line
 
-
 import rospy
+
+import cv2
+from cv_bridge import CvBridge, CvBridgeError
+from sensor_msgs.msg import Image
+
 from autorally_msgs.msg import chassisCommand
 from nav_msgs.msg import Odometry
 import tf as ros_tf
 
+from pprint import pprint
 
 pose_publisher = None
 
 class temp:
     joystick_command = chassisCommand()
-
 
 def run_carla_client():
     # start the client and open the port
@@ -41,17 +46,18 @@ def run_carla_client():
 
         settings = CarlaSettings()
         settings.set(
-                SynchronousMode=True,
+                SynchronousMode=False,
                 SendNonPlayerAgentsInfo=True,
                 NumberOfVehicles=0,
                 NumberOfPedestrians=0,
-                WeatherId=random.choice([1, 3, 7, 8, 14]))
+                QualityLevel='Epic',
+                WeatherId=random.choice([1]))
         settings.randomize_seeds()
 
         # set up a camera
         camera = Camera('CameraRGB')
-        camera.set_image_size(800,600)
-        camera.set_position(30,0,130) # position of the camera relative to the car in cm
+        camera.set_image_size(640,512)
+        camera.set_position(0.60,0,1.60) # position of the camera relative to the car in cm
         settings.add_sensor(camera)
 
         # now load these settings into the server
@@ -65,15 +71,39 @@ def run_carla_client():
         # to start the episode.
         client.start_episode(player_start)
 
+        prev_time = time.time()
+        images = 0
+        prev_measure_time = None
         # looping for each frame from server
         while True:
             measurements, sensor_data = client.read_data()
+            
+            im = sensor_data.get('CameraRGB', None)
+            if im is not None:
+                # pprint(dir(im))
+                # pprint(sensor_data.viewvalues())
+                # pprint(sensor_data.viewitems())
+                np_image = image_converter.to_rgb_array(im)
+                image_message = temp.bridge.cv2_to_imgmsg(np_image, encoding="rgb8")
+                temp.image_pub.publish(image_message)
+                images += 1
+                t = time.time()
+                if ((prev_time + 1) < t):
+                    print('FPS: %d' % images)
+                    prev_time += 1
+                    images = 0
+            
+            if prev_measure_time is None:
+                prev_measure_time = measurements.game_timestamp
+            
+            # print(prev_measure_time - measurements.game_timestamp)
+            prev_measure_time = measurements.game_timestamp
 
             measurements = measurements.player_measurements
             pose_msg = Odometry()
-            pose_msg.pose.pose.position.x = measurements.transform.location.x / 100
-            pose_msg.pose.pose.position.y = measurements.transform.location.y / 100
-            pose_msg.pose.pose.position.z = measurements.transform.location.z / 100
+            pose_msg.pose.pose.position.x = measurements.transform.location.x
+            pose_msg.pose.pose.position.y = measurements.transform.location.y
+            pose_msg.pose.pose.position.z = measurements.transform.location.z
             
             quaternion = ros_tf.transformations.quaternion_from_euler(
                     measurements.transform.rotation.roll,
@@ -84,7 +114,7 @@ def run_carla_client():
             pose_msg.pose.pose.orientation.z = quaternion[2]
             pose_msg.pose.pose.orientation.w = quaternion[3]
 
-            pose_msg.twist.twist.linear.x = measurements.forward_speed * 1000/3600 # in km/h
+            pose_msg.twist.twist.linear.x = measurements.forward_speed
 
             temp.pose_pub.publish(pose_msg)
 
@@ -110,6 +140,9 @@ if __name__ == '__main__':
     rospy.init_node('carla')
     command_sub = rospy.Subscriber('/joystick/chassisCommand', chassisCommand, joystick_control_callback)
     temp.pose_pub = rospy.Publisher('/pose_ground_truth', Odometry, queue_size=1) 
+    temp.image_pub = rospy.Publisher("camera_image",Image, queue_size=1)
+
+    temp.bridge = CvBridge()
 
     # try to start the client - if connection error, then keep trying until success
     try:
@@ -120,6 +153,3 @@ if __name__ == '__main__':
 
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
-
-
-

@@ -19,6 +19,7 @@ Use ARROWS or WASD keys for control.
     AD           : steer
     Q            : toggle reverse
     Space        : hand-brake
+    P            : toggle autopilot
 
     R            : restart level
 
@@ -41,6 +42,7 @@ try:
     from pygame.locals import K_UP
     from pygame.locals import K_a
     from pygame.locals import K_d
+    from pygame.locals import K_p
     from pygame.locals import K_q
     from pygame.locals import K_r
     from pygame.locals import K_s
@@ -68,7 +70,7 @@ MINI_WINDOW_WIDTH = 320
 MINI_WINDOW_HEIGHT = 180
 
 
-def make_carla_settings(enable_lidar):
+def make_carla_settings(args):
     """Make a CarlaSettings object with the settings we need."""
     settings = CarlaSettings()
     settings.set(
@@ -76,30 +78,31 @@ def make_carla_settings(enable_lidar):
         SendNonPlayerAgentsInfo=True,
         NumberOfVehicles=15,
         NumberOfPedestrians=30,
-        WeatherId=random.choice([1, 3, 7, 8, 14]))
+        WeatherId=random.choice([1, 3, 7, 8, 14]),
+        QualityLevel=args.quality_level)
     settings.randomize_seeds()
     camera0 = sensor.Camera('CameraRGB')
     camera0.set_image_size(WINDOW_WIDTH, WINDOW_HEIGHT)
-    camera0.set_position(200, 0, 140)
+    camera0.set_position(2.0, 0.0, 1.4)
     camera0.set_rotation(0.0, 0.0, 0.0)
     settings.add_sensor(camera0)
     camera1 = sensor.Camera('CameraDepth', PostProcessing='Depth')
     camera1.set_image_size(MINI_WINDOW_WIDTH, MINI_WINDOW_HEIGHT)
-    camera1.set_position(200, 0, 140)
+    camera1.set_position(2.0, 0.0, 1.4)
     camera1.set_rotation(0.0, 0.0, 0.0)
     settings.add_sensor(camera1)
     camera2 = sensor.Camera('CameraSemSeg', PostProcessing='SemanticSegmentation')
     camera2.set_image_size(MINI_WINDOW_WIDTH, MINI_WINDOW_HEIGHT)
-    camera2.set_position(200, 0, 140)
+    camera2.set_position(2.0, 0.0, 1.4)
     camera2.set_rotation(0.0, 0.0, 0.0)
     settings.add_sensor(camera2)
-    if enable_lidar:
+    if args.lidar:
         lidar = sensor.Lidar('Lidar32')
-        lidar.set_position(0, 0, 250)
+        lidar.set_position(0, 0, 2.5)
         lidar.set_rotation(0, 0, 0)
         lidar.set(
             Channels=32,
-            Range=5000,
+            Range=50,
             PointsPerSecond=100000,
             RotationFrequency=10,
             UpperFovLimit=10,
@@ -129,21 +132,22 @@ class Timer(object):
 
 
 class CarlaGame(object):
-    def __init__(self, carla_client, enable_lidar=False, city_name=None):
+    def __init__(self, carla_client, args):
         self.client = carla_client
+        self._carla_settings = make_carla_settings(args)
         self._timer = None
         self._display = None
         self._main_image = None
         self._mini_view_image1 = None
         self._mini_view_image2 = None
-        self._enable_lidar = enable_lidar
+        self._enable_autopilot = args.autopilot
         self._lidar_measurement = None
         self._map_view = None
         self._is_on_reverse = False
-        self._city_name = city_name
-        self._map = CarlaMap(city_name, 16.43, 50.0) if city_name is not None else None
-        self._map_shape = self._map.map_image.shape if city_name is not None else None
-        self._map_view = self._map.get_map(WINDOW_HEIGHT) if city_name is not None else None
+        self._city_name = args.map_name
+        self._map = CarlaMap(self._city_name, 16.43, 50.0) if self._city_name is not None else None
+        self._map_shape = self._map.map_image.shape if self._city_name is not None else None
+        self._map_view = self._map.get_map(WINDOW_HEIGHT) if self._city_name is not None else None
         self._position = None
         self._agent_positions = None
 
@@ -175,7 +179,9 @@ class CarlaGame(object):
         self._on_new_episode()
 
     def _on_new_episode(self):
-        scene = self.client.load_settings(make_carla_settings(self._enable_lidar))
+        self._carla_settings.randomize_seeds()
+        self._carla_settings.randomize_weather()
+        scene = self.client.load_settings(self._carla_settings)
         number_of_player_starts = len(scene.player_start_spots)
         player_start = np.random.randint(number_of_player_starts)
         print('Starting new episode...')
@@ -188,11 +194,10 @@ class CarlaGame(object):
 
         measurements, sensor_data = self.client.read_data()
 
-        self._main_image = sensor_data['CameraRGB']
-        self._mini_view_image1 = sensor_data['CameraDepth']
-        self._mini_view_image2 = sensor_data['CameraSemSeg']
-        if self._enable_lidar:
-            self._lidar_measurement = sensor_data['Lidar32']
+        self._main_image = sensor_data.get('CameraRGB', None)
+        self._mini_view_image1 = sensor_data.get('CameraDepth', None)
+        self._mini_view_image2 = sensor_data.get('CameraSemSeg', None)
+        self._lidar_measurement = sensor_data.get('Lidar32', None)
 
         # Print measurements every second.
         if self._timer.elapsed_seconds_since_lap() > 1.0:
@@ -230,6 +235,8 @@ class CarlaGame(object):
 
         if control is None:
             self._on_new_episode()
+        elif self._enable_autopilot:
+            self.client.send_control(measurements.player_measurements.autopilot_control)
         else:
             self.client.send_control(control)
 
@@ -253,6 +260,8 @@ class CarlaGame(object):
             control.hand_brake = True
         if keys[K_q]:
             self._is_on_reverse = not self._is_on_reverse
+        if keys[K_p]:
+            self._enable_autopilot = not self._enable_autopilot
         control.reverse = self._is_on_reverse
         return control
 
@@ -273,7 +282,7 @@ class CarlaGame(object):
             ori_y=lane_orientation[1],
             step=self._timer.step,
             fps=self._timer.ticks_per_second(),
-            speed=player_measurements.forward_speed,
+            speed=player_measurements.forward_speed * 3.6,
             other_lane=100 * player_measurements.intersection_otherlane,
             offroad=100 * player_measurements.intersection_offroad)
         print_over_same_line(message)
@@ -285,7 +294,7 @@ class CarlaGame(object):
         message = message.format(
             step=self._timer.step,
             fps=self._timer.ticks_per_second(),
-            speed=player_measurements.forward_speed,
+            speed=player_measurements.forward_speed * 3.6,
             other_lane=100 * player_measurements.intersection_otherlane,
             offroad=100 * player_measurements.intersection_offroad)
         print_over_same_line(message)
@@ -314,7 +323,7 @@ class CarlaGame(object):
 
         if self._lidar_measurement is not None:
             lidar_data = np.array(self._lidar_measurement.data[:, :2])
-            lidar_data /= 50.0
+            lidar_data *= 2.0
             lidar_data += 100.0
             lidar_data = np.fabs(lidar_data)
             lidar_data = lidar_data.astype(np.int32)
@@ -376,9 +385,19 @@ def main():
         type=int,
         help='TCP port to listen to (default: 2000)')
     argparser.add_argument(
+        '-a', '--autopilot',
+        action='store_true',
+        help='enable autopilot')
+    argparser.add_argument(
         '-l', '--lidar',
         action='store_true',
         help='enable Lidar')
+    argparser.add_argument(
+        '-q', '--quality-level',
+        choices=['Low', 'Epic'],
+        type=lambda s: s.title(),
+        default='Epic',
+        help='graphics quality level, a lower level makes the simulation run considerably faster.')
     argparser.add_argument(
         '-m', '--map-name',
         metavar='M',
@@ -398,7 +417,7 @@ def main():
         try:
 
             with make_carla_client(args.host, args.port) as client:
-                game = CarlaGame(client, args.lidar, args.map_name)
+                game = CarlaGame(client, args)
                 game.execute()
                 break
 

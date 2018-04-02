@@ -22,7 +22,7 @@ class APlayerStart;
 class ASceneCaptureCamera;
 class UCarlaGameInstance;
 class UTaggerDelegate;
-
+class UCarlaSettingsDelegate;
 UCLASS(HideCategories=(ActorTick))
 class CARLA_API ACarlaGameModeBase : public AGameModeBase
 {
@@ -38,12 +38,20 @@ public:
 
   virtual void BeginPlay() override;
 
+  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
   virtual void Tick(float DeltaSeconds) override;
 
   FDataRouter &GetDataRouter()
   {
     check(GameInstance != nullptr);
     return GameInstance->GetDataRouter();
+  }
+
+  UFUNCTION(BlueprintPure, Category="CARLA Settings")
+  UCarlaSettingsDelegate *GetCARLASettingsDelegate()
+  {
+    return CarlaSettingsDelegate;
   }
 
 protected:
@@ -90,6 +98,9 @@ private:
 
   UPROPERTY()
   UTaggerDelegate *TaggerDelegate;
+
+  UPROPERTY()
+  UCarlaSettingsDelegate* CarlaSettingsDelegate;
 
   UPROPERTY()
   ADynamicWeather *DynamicWeather;

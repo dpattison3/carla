@@ -17,15 +17,22 @@
 
 #include <cstring>
 
+// Conversion from centimeters to meters.
+static constexpr float TO_METERS = 1e-2;
+
 // =============================================================================
 // -- Static local methods -----------------------------------------------------
 // =============================================================================
 
 static auto MakeCharBuffer(const FString &String)
 {
-  const char *Ptr = TCHAR_TO_ANSI(*String);
+  const char *Ptr = TCHAR_TO_UTF8(*String);
   auto Buffer = MakeUnique<char[]>(std::strlen(Ptr) + 1u); // + null terminator.
+  #if defined(_WIN32)
+  strcpy_s(Buffer.Get(),String.Len()+1, Ptr);
+  #else
   std::strcpy(Buffer.Get(), Ptr);
+  #endif
   return TUniquePtr<const char[]>(Buffer.Release());
 }
 
@@ -43,7 +50,7 @@ static void Encode(const FRotator &Rotator, carla_rotation3d &Data)
 
 static void Encode(const FTransform &Transform, carla_transform &Data)
 {
-  Encode(Transform.GetLocation(), Data.location);
+  Encode(Transform.GetLocation() * TO_METERS, Data.location);
   Encode(Transform.GetRotation().GetForwardVector(), Data.orientation);
   Encode(Transform.Rotator(), Data.rotation);
 }
@@ -56,7 +63,7 @@ static TUniquePtr<const char[]> Encode(
   Data.type = [](const FString &Type) {
 #define CARLA_CHECK_TYPE(Str) if (Type == TEXT(#Str)) return CARLA_SERVER_ ## Str;
       CARLA_CHECK_TYPE(CAMERA)
-      CARLA_CHECK_TYPE(LIDAR_RAY_TRACE)
+      CARLA_CHECK_TYPE(LIDAR_RAY_CAST)
       else return CARLA_SERVER_SENSOR_UNKNOWN;
 #undef CARLA_CHECK_TYPE
   }(SensorDescription.Type);
@@ -103,12 +110,12 @@ void FCarlaEncoder::Encode(
   Data.game_timestamp = PlayerState.GetGameTimeStamp();
   auto &Player = Data.player_measurements;
   ::Encode(PlayerState.GetTransform(), Player.transform);
-  ::Encode(PlayerState.GetBoundsExtent(), Player.box_extent);
-  ::Encode(PlayerState.GetAcceleration(), Player.acceleration);
-  Player.forward_speed = PlayerState.GetForwardSpeed();
-  Player.collision_vehicles = PlayerState.GetCollisionIntensityCars();
-  Player.collision_pedestrians = PlayerState.GetCollisionIntensityPedestrians();
-  Player.collision_other = PlayerState.GetCollisionIntensityOther();
+  ::Encode(PlayerState.GetBoundsExtent() * TO_METERS, Player.box_extent);
+  ::Encode(PlayerState.GetAcceleration() * TO_METERS, Player.acceleration);
+  Player.forward_speed = PlayerState.GetForwardSpeed() * TO_METERS;
+  Player.collision_vehicles = PlayerState.GetCollisionIntensityCars() * TO_METERS;
+  Player.collision_pedestrians = PlayerState.GetCollisionIntensityPedestrians() * TO_METERS;
+  Player.collision_other = PlayerState.GetCollisionIntensityOther() * TO_METERS;
   Player.intersection_otherlane = PlayerState.GetOtherLaneIntersectionFactor();
   Player.intersection_offroad = PlayerState.GetOffRoadIntersectionFactor();
   Player.autopilot_control.steer = PlayerState.GetSteer();
@@ -199,7 +206,7 @@ void FCarlaEncoder::Visit(const UVehicleAgentComponent &Agent)
   auto &Vehicle = Agent.GetVehicle();
   ::Encode(Vehicle.GetVehicleTransform(), Data.transform);
   Data.type = CARLA_SERVER_AGENT_VEHICLE;
-  Data.forward_speed = Vehicle.GetVehicleForwardSpeed();
+  Data.forward_speed = Vehicle.GetVehicleForwardSpeed() * TO_METERS;
   ::Encode(Vehicle.GetVehicleBoundsExtent(), Data.box_extent);
 }
 
@@ -207,6 +214,6 @@ void FCarlaEncoder::Visit(const UWalkerAgentComponent &Agent)
 {
   ::Encode(Agent.GetComponentTransform(), Data.transform);
   Data.type = CARLA_SERVER_AGENT_PEDESTRIAN;
-  Data.forward_speed = Agent.GetForwardSpeed();
+  Data.forward_speed = Agent.GetForwardSpeed() * TO_METERS;
   ::Encode(Agent.GetBoundingBoxExtent(), Data.box_extent);
 }

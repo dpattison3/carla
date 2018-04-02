@@ -1,7 +1,8 @@
 {
-	"FileVersion": 3,
+	"PluginFileVersion": 3,
 	"Version": 1,
-	"VersionName": "0.7.1",
+	"VersionName": "0.8.0",
+	"DisplayName": "CARLA",
 	"FriendlyName": "CARLA",
 	"Description": "",
 	"Category": "Science",
@@ -17,7 +18,7 @@
 		{
 			"Name": "Carla",
 			"Type": "Developer",
-			"LoadingPhase": "Default",
+			"LoadingPhase": "PreDefault",
 			"AdditionalDependencies": [
 				"Engine"
 			]

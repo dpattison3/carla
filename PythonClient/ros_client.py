@@ -91,7 +91,7 @@ def run_carla_client():
                 images += 1
                 t = time.time()
                 if ((prev_time + 1) < t):
-                    print('FPS: %d\tSteer: %1.3f Throttle %1.3f, Brake %1.3f' % (images,temp.joystick_command.steering,max(temp.joystick_command.throttle*3,0),-min(temp.joystick_command.throttle,0)))
+                    print('FPS: %d\tSteer: %1.3f Throttle %1.3f, Brake %1.3f' % (images,temp.joystick_command.steering,max(temp.joystick_command.throttle,0),-min(temp.joystick_command.throttle,0)))
                     prev_time += 1
                     images = 0
             
@@ -124,7 +124,7 @@ def run_carla_client():
 
             client.send_control(
                 steer=temp.joystick_command.steering,
-                throttle=max(temp.joystick_command.throttle*3,0),
+                throttle=max(temp.joystick_command.throttle,0),
                 brake=-min(temp.joystick_command.throttle,0),
                 hand_brake=False,
                 reverse=False)

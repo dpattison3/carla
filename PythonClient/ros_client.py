@@ -15,6 +15,8 @@ import logging
 import random
 import time
 
+from math import cos,sin,pi
+
 from carla import image_converter
 from carla.client import make_carla_client
 from carla.sensor import Camera, Lidar
@@ -50,7 +52,7 @@ def run_carla_client():
                 SendNonPlayerAgentsInfo=True,
                 NumberOfVehicles=0,
                 NumberOfPedestrians=0,
-                QualityLevel='Epic',
+                QualityLevel='Low',
                 WeatherId=random.choice([1]))
         settings.randomize_seeds()
 
@@ -89,7 +91,7 @@ def run_carla_client():
                 images += 1
                 t = time.time()
                 if ((prev_time + 1) < t):
-                    print('FPS: %d' % images)
+                    print('FPS: %d\tSteer: %1.3f Throttle %1.3f, Brake %1.3f' % (images,temp.joystick_command.steering,max(temp.joystick_command.throttle*3,0),-min(temp.joystick_command.throttle,0)))
                     prev_time += 1
                     images = 0
             
@@ -106,21 +108,23 @@ def run_carla_client():
             pose_msg.pose.pose.position.z = measurements.transform.location.z
             
             quaternion = ros_tf.transformations.quaternion_from_euler(
-                    measurements.transform.rotation.roll,
-                    measurements.transform.rotation.pitch,
-                    measurements.transform.rotation.yaw)
+                    measurements.transform.rotation.roll*pi/180,
+                    measurements.transform.rotation.pitch*pi/180,
+                    measurements.transform.rotation.yaw*pi/180)
+            # print(measurements.transform.rotation.yaw)
             pose_msg.pose.pose.orientation.x = quaternion[0]
             pose_msg.pose.pose.orientation.y = quaternion[1]
             pose_msg.pose.pose.orientation.z = quaternion[2]
             pose_msg.pose.pose.orientation.w = quaternion[3]
 
-            pose_msg.twist.twist.linear.x = measurements.forward_speed
+            pose_msg.twist.twist.linear.x = measurements.forward_speed * cos(measurements.transform.rotation.yaw*pi/180)
+            pose_msg.twist.twist.linear.y = measurements.forward_speed * sin(measurements.transform.rotation.yaw*pi/180)
 
             temp.pose_pub.publish(pose_msg)
 
             client.send_control(
                 steer=temp.joystick_command.steering,
-                throttle=max(temp.joystick_command.throttle,0),
+                throttle=max(temp.joystick_command.throttle*3,0),
                 brake=-min(temp.joystick_command.throttle,0),
                 hand_brake=False,
                 reverse=False)
@@ -139,7 +143,7 @@ if __name__ == '__main__':
 
     rospy.init_node('carla')
     command_sub = rospy.Subscriber('/joystick/chassisCommand', chassisCommand, joystick_control_callback)
-    temp.pose_pub = rospy.Publisher('/pose_ground_truth', Odometry, queue_size=1) 
+    temp.pose_pub = rospy.Publisher('/pose_estimate', Odometry, queue_size=1) 
     temp.image_pub = rospy.Publisher("camera_image",Image, queue_size=1)
 
     temp.bridge = CvBridge()

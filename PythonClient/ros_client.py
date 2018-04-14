@@ -52,7 +52,7 @@ def run_carla_client():
                 SendNonPlayerAgentsInfo=True,
                 NumberOfVehicles=0,
                 NumberOfPedestrians=0,
-                QualityLevel='Epic',
+                QualityLevel='Low',
                 WeatherId=random.choice([1]))
         settings.randomize_seeds()
 
@@ -117,8 +117,20 @@ def run_carla_client():
             pose_msg.pose.pose.orientation.z = quaternion[2]
             pose_msg.pose.pose.orientation.w = quaternion[3]
 
-            pose_msg.twist.twist.linear.x = measurements.forward_speed * cos(measurements.transform.rotation.yaw*pi/180)
-            pose_msg.twist.twist.linear.y = measurements.forward_speed * sin(measurements.transform.rotation.yaw*pi/180)
+            # pose_msg.twist.twist.linear.x = measurements.forward_speed * cos(measurements.transform.rotation.yaw*pi/180)
+            # pose_msg.twist.twist.linear.y = measurements.forward_speed * sin(measurements.transform.rotation.yaw*pi/180)
+            pose_msg.twist.twist.linear.x = measurements.velocity.x
+            pose_msg.twist.twist.linear.y = measurements.velocity.y
+            pose_msg.twist.twist.linear.z = measurements.velocity.z
+
+            theta = measurements.transform.rotation.yaw*pi/180
+            calculated_forward_speed = measurements.velocity.x * cos(theta) + measurements.velocity.y * sin(theta)
+            lateral_velocity = measurements.velocity.y * cos(theta) - measurements.velocity.x * sin(theta)
+            # print("Forward v: %f  Calculated v: %f  Laterval v: %f"%(measurements.forward_speed,calculated_forward_speed, lateral_velocity))
+
+            pose_msg.twist.twist.angular.x = measurements.angular_rate.x*pi/180
+            pose_msg.twist.twist.angular.y = measurements.angular_rate.y*pi/180
+            pose_msg.twist.twist.angular.z = measurements.angular_rate.z*pi/180
 
             temp.pose_pub.publish(pose_msg)
 
@@ -137,12 +149,15 @@ def joystick_control_callback(msg):
     temp.joystick_command = msg
     #print(temp.joystick_command)
 
-
+def mppi_control_callback(msg):
+    temp.joystick_command = msg
+    temp.joystick_command.throttle *= 2
 
 if __name__ == '__main__':
 
     rospy.init_node('carla')
     command_sub = rospy.Subscriber('/joystick/chassisCommand', chassisCommand, joystick_control_callback)
+    mppi_sub = rospy.Subscriber('/mppi_controller/chassisCommand', chassisCommand, mppi_control_callback)
     temp.pose_pub = rospy.Publisher('/pose_estimate', Odometry, queue_size=1) 
     temp.image_pub = rospy.Publisher("camera_image",Image, queue_size=1)
 

@@ -50,6 +50,10 @@ public:
   UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
   float GetVehicleForwardSpeed() const;
 
+  /// Velocity (x,y,z), world frame, in cm/s.
+  UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
+  FVector GetVehicleVelocity() const;
+
   /// Orientation vector of the vehicle, pointing forward.
   UFUNCTION(Category = "CARLA Wheeled Vehicle", BlueprintCallable)
   FVector GetVehicleOrientation() const;

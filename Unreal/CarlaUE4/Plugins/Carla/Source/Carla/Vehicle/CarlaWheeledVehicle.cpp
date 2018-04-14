@@ -13,6 +13,8 @@
 #include "Components/BoxComponent.h"
 #include "Engine/CollisionProfile.h"
 
+#include <iostream>
+
 // =============================================================================
 // -- Constructor and destructor -----------------------------------------------
 // =============================================================================
@@ -46,7 +48,17 @@ FTransform ACarlaWheeledVehicle::GetVehicleTransform() const
 
 float ACarlaWheeledVehicle::GetVehicleForwardSpeed() const
 {
+  // std::cout << TCHAR_TO_UTF8(*(GetVelocity().ToString())) << std::endl;
+  // std::cout << TCHAR_TO_UTF8(*(GetVelocity().ToString())) << std::endl;
+  // UE_LOG(LogTemp, Warning, TEXT("Velocity is %s"),*GetVelocity().ToString());
+  // UE_LOG(LogTemp, Warning, TEXT("Acceleration is %s"),*GetVehicleMovementComponent()->Velocity.ToString());
+  // UE_LOG(LogTemp, Warning, TEXT("AngularVelocity is %s"),*GetRotationRate()->ToString());
   return GetVehicleMovementComponent()->GetForwardSpeed();
+}
+
+FVector ACarlaWheeledVehicle::GetVehicleVelocity() const
+{
+  return GetVelocity();
 }
 
 FVector ACarlaWheeledVehicle::GetVehicleOrientation() const

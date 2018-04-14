@@ -52,7 +52,7 @@ def run_carla_client():
                 SendNonPlayerAgentsInfo=True,
                 NumberOfVehicles=0,
                 NumberOfPedestrians=0,
-                QualityLevel='Low',
+                QualityLevel='Epic',
                 WeatherId=random.choice([1]))
         settings.randomize_seeds()
 

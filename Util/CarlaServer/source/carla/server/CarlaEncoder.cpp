@@ -157,6 +157,8 @@ namespace server {
     Set(player->mutable_transform(), values.player_measurements.transform);
     Set(player->mutable_box_extent(), values.player_measurements.box_extent);
     Set(player->mutable_acceleration(), values.player_measurements.acceleration);
+    Set(player->mutable_velocity(), values.player_measurements.velocity);
+    Set(player->mutable_angular_rate(), values.player_measurements.angular_rate);
     player->set_forward_speed(values.player_measurements.forward_speed);
     player->set_collision_vehicles(values.player_measurements.collision_vehicles);
     player->set_collision_pedestrians(values.player_measurements.collision_pedestrians);

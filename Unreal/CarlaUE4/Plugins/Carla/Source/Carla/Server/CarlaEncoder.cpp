@@ -112,6 +112,8 @@ void FCarlaEncoder::Encode(
   ::Encode(PlayerState.GetTransform(), Player.transform);
   ::Encode(PlayerState.GetBoundsExtent() * TO_METERS, Player.box_extent);
   ::Encode(PlayerState.GetAcceleration() * TO_METERS, Player.acceleration);
+  ::Encode(PlayerState.Getvelocity() * TO_METERS, Player.velocity);
+  ::Encode(PlayerState.GetAngularRate(), Player.angular_rate);
   Player.forward_speed = PlayerState.GetForwardSpeed() * TO_METERS;
   Player.collision_vehicles = PlayerState.GetCollisionIntensityCars() * TO_METERS;
   Player.collision_pedestrians = PlayerState.GetCollisionIntensityPedestrians() * TO_METERS;

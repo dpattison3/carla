@@ -15,7 +15,7 @@ import logging
 import random
 import time
 
-from math import cos,sin,pi
+from math import cos,sin,pi,floor
 
 from carla import image_converter
 from carla.client import make_carla_client
@@ -32,6 +32,7 @@ from sensor_msgs.msg import Image
 
 from autorally_msgs.msg import chassisCommand
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Time
 import tf as ros_tf
 
 from pprint import pprint
@@ -79,7 +80,9 @@ def run_carla_client():
         # looping for each frame from server
         while True:
             measurements, sensor_data = client.read_data()
-            
+            t = Time()
+            t.data = rospy.Time.from_sec(measurements.game_timestamp/1000.0)
+            temp.time_pub.publish(t)
             im = sensor_data.get('CameraRGB', None)
             if im is not None:
                 # pprint(dir(im))
@@ -87,6 +90,7 @@ def run_carla_client():
                 # pprint(sensor_data.viewitems())
                 np_image = image_converter.to_rgb_array(im)
                 image_message = temp.bridge.cv2_to_imgmsg(np_image, encoding="rgb8")
+                image_message.header.stamp = rospy.Time.from_sec(measurements.game_timestamp/1000.0)
                 temp.image_pub.publish(image_message)
                 images += 1
                 t = time.time()
@@ -101,36 +105,39 @@ def run_carla_client():
             # print(prev_measure_time - measurements.game_timestamp)
             prev_measure_time = measurements.game_timestamp
 
-            measurements = measurements.player_measurements
+            player_measurements = measurements.player_measurements
             pose_msg = Odometry()
-            pose_msg.pose.pose.position.x = measurements.transform.location.x
-            pose_msg.pose.pose.position.y = measurements.transform.location.y
-            pose_msg.pose.pose.position.z = measurements.transform.location.z
+
+            pose_msg.header.stamp = rospy.Time.from_sec(measurements.game_timestamp/1000.0)
+
+            pose_msg.pose.pose.position.x = player_measurements.transform.location.x
+            pose_msg.pose.pose.position.y = player_measurements.transform.location.y
+            pose_msg.pose.pose.position.z = player_measurements.transform.location.z
             
             quaternion = ros_tf.transformations.quaternion_from_euler(
-                    measurements.transform.rotation.roll*pi/180,
-                    measurements.transform.rotation.pitch*pi/180,
-                    measurements.transform.rotation.yaw*pi/180)
-            # print(measurements.transform.rotation.yaw)
+                    player_measurements.transform.rotation.roll*pi/180,
+                    player_measurements.transform.rotation.pitch*pi/180,
+                    player_measurements.transform.rotation.yaw*pi/180)
+            # print(player_measurements.transform.rotation.yaw)
             pose_msg.pose.pose.orientation.x = quaternion[0]
             pose_msg.pose.pose.orientation.y = quaternion[1]
             pose_msg.pose.pose.orientation.z = quaternion[2]
             pose_msg.pose.pose.orientation.w = quaternion[3]
 
-            # pose_msg.twist.twist.linear.x = measurements.forward_speed * cos(measurements.transform.rotation.yaw*pi/180)
-            # pose_msg.twist.twist.linear.y = measurements.forward_speed * sin(measurements.transform.rotation.yaw*pi/180)
-            pose_msg.twist.twist.linear.x = measurements.velocity.x
-            pose_msg.twist.twist.linear.y = measurements.velocity.y
-            pose_msg.twist.twist.linear.z = measurements.velocity.z
+            # pose_msg.twist.twist.linear.x = player_measurements.forward_speed * cos(player_measurements.transform.rotation.yaw*pi/180)
+            # pose_msg.twist.twist.linear.y = player_measurements.forward_speed * sin(player_measurements.transform.rotation.yaw*pi/180)
+            pose_msg.twist.twist.linear.x = player_measurements.velocity.x
+            pose_msg.twist.twist.linear.y = player_measurements.velocity.y
+            pose_msg.twist.twist.linear.z = player_measurements.velocity.z
 
-            theta = measurements.transform.rotation.yaw*pi/180
-            calculated_forward_speed = measurements.velocity.x * cos(theta) + measurements.velocity.y * sin(theta)
-            lateral_velocity = measurements.velocity.y * cos(theta) - measurements.velocity.x * sin(theta)
-            # print("Forward v: %f  Calculated v: %f  Laterval v: %f"%(measurements.forward_speed,calculated_forward_speed, lateral_velocity))
+            theta = player_measurements.transform.rotation.yaw*pi/180
+            calculated_forward_speed = player_measurements.velocity.x * cos(theta) + player_measurements.velocity.y * sin(theta)
+            lateral_velocity = player_measurements.velocity.y * cos(theta) - player_measurements.velocity.x * sin(theta)
+            # print("Forward v: %f  Calculated v: %f  Laterval v: %f"%(player_measurements.forward_speed,calculated_forward_speed, lateral_velocity))
 
-            pose_msg.twist.twist.angular.x = measurements.angular_rate.x*pi/180
-            pose_msg.twist.twist.angular.y = measurements.angular_rate.y*pi/180
-            pose_msg.twist.twist.angular.z = measurements.angular_rate.z*pi/180
+            pose_msg.twist.twist.angular.x = player_measurements.angular_rate.x*pi/180
+            pose_msg.twist.twist.angular.y = player_measurements.angular_rate.y*pi/180
+            pose_msg.twist.twist.angular.z = player_measurements.angular_rate.z*pi/180
 
             temp.pose_pub.publish(pose_msg)
 
@@ -160,6 +167,7 @@ if __name__ == '__main__':
     mppi_sub = rospy.Subscriber('/mppi_controller/chassisCommand', chassisCommand, mppi_control_callback)
     temp.pose_pub = rospy.Publisher('/pose_estimate', Odometry, queue_size=1) 
     temp.image_pub = rospy.Publisher("camera_image",Image, queue_size=1)
+    temp.time_pub = rospy.Publisher("/clock",Time, queue_size=1)
 
     temp.bridge = CvBridge()
 

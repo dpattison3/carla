@@ -151,7 +151,7 @@ def joystick_control_callback(msg):
 
 def mppi_control_callback(msg):
     temp.joystick_command = msg
-    temp.joystick_command.throttle *= 2
+    temp.joystick_command.throttle
 
 if __name__ == '__main__':
 

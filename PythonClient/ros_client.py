@@ -109,15 +109,16 @@ def run_carla_client():
             pose_msg = Odometry()
 
             pose_msg.header.stamp = rospy.Time.from_sec(measurements.game_timestamp/1000.0)
+            pose_msg.header.frame_id = "base_link"
 
             pose_msg.pose.pose.position.x = player_measurements.transform.location.x
-            pose_msg.pose.pose.position.y = player_measurements.transform.location.y
-            pose_msg.pose.pose.position.z = player_measurements.transform.location.z
+            pose_msg.pose.pose.position.y = -player_measurements.transform.location.y
+            pose_msg.pose.pose.position.z = 0  # Always on the ground planeplayer_measurements.transform.location.z
             
             quaternion = ros_tf.transformations.quaternion_from_euler(
-                    player_measurements.transform.rotation.roll*pi/180,
-                    player_measurements.transform.rotation.pitch*pi/180,
-                    player_measurements.transform.rotation.yaw*pi/180)
+                    player_measurements.transform.rotation.roll*pi/180*0,
+                    -player_measurements.transform.rotation.pitch*pi/180,
+                    -player_measurements.transform.rotation.yaw*pi/180)
             # print(player_measurements.transform.rotation.yaw)
             pose_msg.pose.pose.orientation.x = quaternion[0]
             pose_msg.pose.pose.orientation.y = quaternion[1]
@@ -127,7 +128,7 @@ def run_carla_client():
             # pose_msg.twist.twist.linear.x = player_measurements.forward_speed * cos(player_measurements.transform.rotation.yaw*pi/180)
             # pose_msg.twist.twist.linear.y = player_measurements.forward_speed * sin(player_measurements.transform.rotation.yaw*pi/180)
             pose_msg.twist.twist.linear.x = player_measurements.velocity.x
-            pose_msg.twist.twist.linear.y = player_measurements.velocity.y
+            pose_msg.twist.twist.linear.y = -player_measurements.velocity.y
             pose_msg.twist.twist.linear.z = player_measurements.velocity.z
 
             theta = player_measurements.transform.rotation.yaw*pi/180
@@ -136,7 +137,7 @@ def run_carla_client():
             # print("Forward v: %f  Calculated v: %f  Laterval v: %f"%(player_measurements.forward_speed,calculated_forward_speed, lateral_velocity))
 
             pose_msg.twist.twist.angular.x = player_measurements.angular_rate.x*pi/180
-            pose_msg.twist.twist.angular.y = player_measurements.angular_rate.y*pi/180
+            pose_msg.twist.twist.angular.y = -player_measurements.angular_rate.y*pi/180
             pose_msg.twist.twist.angular.z = player_measurements.angular_rate.z*pi/180
 
             temp.pose_pub.publish(pose_msg)
@@ -158,7 +159,6 @@ def joystick_control_callback(msg):
 
 def mppi_control_callback(msg):
     temp.joystick_command = msg
-    temp.joystick_command.throttle
 
 if __name__ == '__main__':
 

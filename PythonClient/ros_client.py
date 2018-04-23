@@ -109,7 +109,8 @@ def run_carla_client():
             pose_msg = Odometry()
 
             pose_msg.header.stamp = rospy.Time.from_sec(measurements.game_timestamp/1000.0)
-            pose_msg.header.frame_id = "base_link"
+            pose_msg.header.frame_id = "odom"
+            pose_msg.child_frame_id = "base_link"
 
             pose_msg.pose.pose.position.x = player_measurements.transform.location.x
             pose_msg.pose.pose.position.y = -player_measurements.transform.location.y
@@ -125,20 +126,15 @@ def run_carla_client():
             pose_msg.pose.pose.orientation.z = quaternion[2]
             pose_msg.pose.pose.orientation.w = quaternion[3]
 
-            # pose_msg.twist.twist.linear.x = player_measurements.forward_speed * cos(player_measurements.transform.rotation.yaw*pi/180)
-            # pose_msg.twist.twist.linear.y = player_measurements.forward_speed * sin(player_measurements.transform.rotation.yaw*pi/180)
+            # left handed linear velocity in cm/s
             pose_msg.twist.twist.linear.x = player_measurements.velocity.x
             pose_msg.twist.twist.linear.y = -player_measurements.velocity.y
             pose_msg.twist.twist.linear.z = player_measurements.velocity.z
 
-            theta = player_measurements.transform.rotation.yaw*pi/180
-            calculated_forward_speed = player_measurements.velocity.x * cos(theta) + player_measurements.velocity.y * sin(theta)
-            lateral_velocity = player_measurements.velocity.y * cos(theta) - player_measurements.velocity.x * sin(theta)
-            # print("Forward v: %f  Calculated v: %f  Laterval v: %f"%(player_measurements.forward_speed,calculated_forward_speed, lateral_velocity))
-
-            pose_msg.twist.twist.angular.x = player_measurements.angular_rate.x*pi/180
-            pose_msg.twist.twist.angular.y = -player_measurements.angular_rate.y*pi/180
-            pose_msg.twist.twist.angular.z = player_measurements.angular_rate.z*pi/180
+            # left handed coordinate system obey left hand rule for rotation
+            pose_msg.twist.twist.angular.x = -player_measurements.angular_rate.x
+            pose_msg.twist.twist.angular.y = player_measurements.angular_rate.y
+            pose_msg.twist.twist.angular.z = -player_measurements.angular_rate.z
 
             temp.pose_pub.publish(pose_msg)
 

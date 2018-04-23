@@ -117,8 +117,8 @@ def run_carla_client():
             pose_msg.pose.pose.position.z = 0  # Always on the ground planeplayer_measurements.transform.location.z
             
             quaternion = ros_tf.transformations.quaternion_from_euler(
-                    player_measurements.transform.rotation.roll*pi/180*0,
-                    -player_measurements.transform.rotation.pitch*pi/180,
+                    -player_measurements.transform.rotation.roll*pi/180,
+                     player_measurements.transform.rotation.pitch*pi/180,
                     -player_measurements.transform.rotation.yaw*pi/180)
             # print(player_measurements.transform.rotation.yaw)
             pose_msg.pose.pose.orientation.x = quaternion[0]
@@ -126,7 +126,6 @@ def run_carla_client():
             pose_msg.pose.pose.orientation.z = quaternion[2]
             pose_msg.pose.pose.orientation.w = quaternion[3]
 
-            # left handed linear velocity in cm/s
             pose_msg.twist.twist.linear.x = player_measurements.velocity.x
             pose_msg.twist.twist.linear.y = -player_measurements.velocity.y
             pose_msg.twist.twist.linear.z = player_measurements.velocity.z

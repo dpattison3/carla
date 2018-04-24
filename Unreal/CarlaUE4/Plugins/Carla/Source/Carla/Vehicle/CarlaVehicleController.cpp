@@ -58,6 +58,8 @@ void ACarlaVehicleController::Possess(APawn *aPawn)
 // -- AActor -------------------------------------------------------------------
 // =============================================================================
 
+#include <iostream>
+
 void ACarlaVehicleController::Tick(float DeltaTime)
 {
   Super::Tick(DeltaTime);
@@ -72,11 +74,9 @@ void ACarlaVehicleController::Tick(float DeltaTime)
     const FVector CurrentSpeed = CarlaPlayerState->Velocity;
     // TODO: This probably needs to be in local coordinates
     CarlaPlayerState->Acceleration = (CurrentSpeed - PreviousSpeed) / DeltaTime;
-    // Numeric differentiation for angular rate
-    FTransform PreviousOrientation = CarlaPlayerState->Transform;
     CarlaPlayerState->Transform = Vehicle->GetVehicleTransform();
-    FTransform CurrentOrientation = CarlaPlayerState->Transform;
-    CarlaPlayerState->AngularRate = PreviousOrientation.GetRelativeTransform(CurrentOrientation).GetRotation().Euler()/DeltaTime;
+    CarlaPlayerState->AngularRate = Vehicle->GetVehicleAngularVelocity();
+
     const auto &AutopilotControl = GetAutopilotControl();
     CarlaPlayerState->Steer = AutopilotControl.Steer;
     CarlaPlayerState->Throttle = AutopilotControl.Throttle;

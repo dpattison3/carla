@@ -13,6 +13,8 @@
 #include "Components/BoxComponent.h"
 #include "Engine/CollisionProfile.h"
 
+#include "PhysXIncludes.h"
+
 #include <iostream>
 
 // =============================================================================
@@ -58,8 +60,16 @@ float ACarlaWheeledVehicle::GetVehicleForwardSpeed() const
 
 FVector ACarlaWheeledVehicle::GetVehicleVelocity() const
 {
-  return GetVelocity();
+  PxVec3 linVel = GetVehicleMovementComponent()->PVehicle->getRigidDynamicActor()->getLinearVelocity();
+  return {linVel.x, linVel.y, linVel.z};
 }
+
+FVector ACarlaWheeledVehicle::GetVehicleAngularVelocity() const
+{
+  PxVec3 angVel = GetVehicleMovementComponent()->PVehicle->getRigidDynamicActor()->getAngularVelocity();
+  return {angVel.x, angVel.y, angVel.z};
+}
+
 
 FVector ACarlaWheeledVehicle::GetVehicleOrientation() const
 {

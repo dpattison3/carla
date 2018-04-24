@@ -33,6 +33,7 @@ from sensor_msgs.msg import Image
 from autorally_msgs.msg import chassisCommand
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Time
+from rosgraph_msgs.msg import Clock
 import tf as ros_tf
 
 from pprint import pprint
@@ -81,8 +82,16 @@ def run_carla_client():
         while True:
             measurements, sensor_data = client.read_data()
             t = Time()
+
             t.data = rospy.Time.from_sec(measurements.game_timestamp/1000.0)
-            temp.time_pub.publish(t)
+
+            clk = Clock()
+
+            clk.clock.secs = t.data.secs
+            clk.clock.nsecs = t.data.nsecs
+
+            temp.time_pub.publish(clk)
+            
             im = sensor_data.get('CameraRGB', None)
             if im is not None:
                 # pprint(dir(im))
@@ -167,7 +176,7 @@ if __name__ == '__main__':
     mppi_sub = rospy.Subscriber('/mppi_controller/chassisCommand', chassisCommand, mppi_control_callback)
     temp.pose_pub = rospy.Publisher('/pose_estimate', Odometry, queue_size=1) 
     temp.image_pub = rospy.Publisher("camera_image",Image, queue_size=1)
-    temp.time_pub = rospy.Publisher("/clock",Time, queue_size=1)
+    temp.time_pub = rospy.Publisher("/clock", Clock, queue_size=1)
 
     temp.bridge = CvBridge()
 

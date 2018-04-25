@@ -31,6 +31,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 
 from autorally_msgs.msg import chassisCommand
+from autorally_msgs.msg import chassisState
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Time
 from rosgraph_msgs.msg import Clock
@@ -81,16 +82,9 @@ def run_carla_client():
         # looping for each frame from server
         while True:
             measurements, sensor_data = client.read_data()
-            t = Time()
 
-            t.data = rospy.Time.from_sec(measurements.game_timestamp/1000.0)
-
-            clk = Clock()
-
-            clk.clock.secs = t.data.secs
-            clk.clock.nsecs = t.data.nsecs
-
-            temp.time_pub.publish(clk)
+            publish_clock(measurements.game_timestamp/1000.0)
+            publish_chassis_state(measurements.game_timestamp/1000.0)
             
             im = sensor_data.get('CameraRGB', None)
             if im is not None:
@@ -153,9 +147,23 @@ def run_carla_client():
                 hand_brake=False,
                 reverse=False)
 
+def publish_clock(timestamp):
+    t = Time()
+    t.data = rospy.Time.from_sec(timestamp)
+    #Simulator acts as a clock server
+    clk = Clock()
+    clk.clock.secs = t.data.secs
+    clk.clock.nsecs = t.data.nsecs
+    temp.time_pub.publish(clk)
 
-
-
+def publish_chassis_state(timestamp):
+    #Fill out the chassis state message
+    chassis_state = chassisState()
+    chassis_state.header.stamp = rospy.Time.from_sec(timestamp)
+    chassis_state.header.frame_id = "CarlaCar"
+    chassis_state.steering = temp.joystick_command.steering
+    chassis_state.throttle = temp.joystick_command.throttle
+    temp.chassis_pub.publish(chassis_state)    
 
 def joystick_control_callback(msg):
     temp.joystick_command = msg
@@ -172,6 +180,7 @@ if __name__ == '__main__':
     temp.pose_pub = rospy.Publisher('/pose_estimate', Odometry, queue_size=1) 
     temp.image_pub = rospy.Publisher("camera_image",Image, queue_size=1)
     temp.time_pub = rospy.Publisher("/clock", Clock, queue_size=1)
+    temp.chassis_pub = rospy.Publisher("/chassisState", chassisState, queue_size=1)
 
     temp.bridge = CvBridge()
 

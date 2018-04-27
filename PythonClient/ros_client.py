@@ -24,6 +24,7 @@ from carla.settings import CarlaSettings
 from carla.tcp import TCPConnectionError
 from carla.util import print_over_same_line
 
+import numpy as np
 import rospy
 
 import cv2
@@ -34,6 +35,7 @@ from autorally_msgs.msg import chassisCommand
 from autorally_msgs.msg import chassisState
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Time
+from std_msgs.msg import Float32 as FloatMsg
 from rosgraph_msgs.msg import Clock
 import tf as ros_tf
 
@@ -43,6 +45,7 @@ pose_publisher = None
 
 class temp:
     joystick_command = chassisCommand()
+    speed_limit = 30.0
 
 def run_carla_client():
     # start the client and open the port
@@ -82,6 +85,8 @@ def run_carla_client():
         # looping for each frame from server
         while True:
             measurements, sensor_data = client.read_data()
+
+            #Get the current speed limit
 
             publish_clock(measurements.game_timestamp/1000.0)
             publish_chassis_state(measurements.game_timestamp/1000.0)
@@ -140,6 +145,20 @@ def run_carla_client():
 
             temp.pose_pub.publish(pose_msg)
 
+            for i in xrange(len(measurements.non_player_agents)):
+                if (measurements.non_player_agents[i].speed_limit_sign.transform.location.x is not 0):
+                    x = measurements.non_player_agents[i].speed_limit_sign.transform.location.x
+                    y = measurements.non_player_agents[i].speed_limit_sign.transform.location.y
+                    xp = player_measurements.transform.location.x
+                    yp = player_measurements.transform.location.y
+                    dist = np.sqrt((x-xp)**2 + (y-yp)**2)
+                    if (dist < 5.0):
+                        temp.speed_limit = measurements.non_player_agents[i].speed_limit_sign.speed_limit
+            #print(temp.speed_limit)
+            speedMsg = FloatMsg()
+            speedMsg.data = temp.speed_limit
+            temp.speed_limit_pub.publish(speedMsg)
+
             client.send_control(
                 steer=temp.joystick_command.steering,
                 throttle=max(temp.joystick_command.throttle,0),
@@ -181,6 +200,7 @@ if __name__ == '__main__':
     temp.image_pub = rospy.Publisher("camera_image",Image, queue_size=1)
     temp.time_pub = rospy.Publisher("/clock", Clock, queue_size=1)
     temp.chassis_pub = rospy.Publisher("/chassisState", chassisState, queue_size=1)
+    temp.speed_limit_pub = rospy.Publisher("/speedLimit", FloatMsg, queue_size=1 )
 
     temp.bridge = CvBridge()
 
